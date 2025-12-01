@@ -27,11 +27,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, House, User, ArrowDown, Trash, Funnel, ChatCircleText, X } from '@phosphor-icons/react'
+import { Plus, House, User, ArrowDown, Trash, Funnel, ChatCircleText, X, CurrencyDollar, ListBullets } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
 type TransactionType = 'personal' | 'household' | 'deposit'
+type Currency = 'USD' | 'LKR' | 'INR' | 'EUR' | 'GBP'
 
 interface Transaction {
   id: string
@@ -41,10 +42,20 @@ interface Transaction {
   date: string
 }
 
+const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  USD: '$',
+  LKR: 'LKR',
+  INR: '₹',
+  EUR: '€',
+  GBP: '£',
+}
+
 function App() {
   const [transactions, setTransactions] = useKV<Transaction[]>('transactions', [])
+  const [currency, setCurrency] = useKV<Currency>('currency', 'LKR')
   const [isExpenseOpen, setIsExpenseOpen] = useState(false)
   const [isDepositOpen, setIsDepositOpen] = useState(false)
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false)
   const [filter, setFilter] = useState<'all' | TransactionType>('all')
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
@@ -56,7 +67,9 @@ function App() {
   const [depositNote, setDepositNote] = useState('')
   
   const [smsText, setSmsText] = useState('')
-  const [activeTab, setActiveTab] = useState<'manual' | 'sms'>('manual')
+  const [activeTab, setActiveTab] = useState<'manual' | 'sms' | 'batch'>('manual')
+  const [parsedTransactions, setParsedTransactions] = useState<Array<{amount: number, merchant: string}>>([])
+  const [batchSmsText, setBatchSmsText] = useState('')
 
   const householdTotal = (transactions || [])
     .filter(t => t.type === 'household')
@@ -127,10 +140,16 @@ function App() {
   )
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    const symbol = CURRENCY_SYMBOLS[currency || 'LKR']
+    const formatted = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount)
+    
+    if (currency === 'LKR' || currency === 'INR') {
+      return `${symbol} ${formatted}`
+    }
+    return `${symbol}${formatted}`
   }
 
   const formatDate = (dateString: string) => {
@@ -144,10 +163,10 @@ function App() {
 
   const parseSMSTransaction = (text: string) => {
     const patterns = [
-      /(?:amt|amount)\s+(?:lkr|inr|usd|eur|gbp|rs\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
-      /(?:lkr|inr|usd|eur|gbp|rs\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
-      /(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr).*?(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
-      /(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr)/i,
+      /(?:AMT|AMOUNT)\s+(?:LKR|INR|USD|EUR|GBP|RS\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:LKR|INR|USD|EUR|GBP|RS\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr).*?(?:Rs\.?|INR|USD|\$|€|£|₹|LKR)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:Rs\.?|INR|USD|\$|€|£|₹|LKR)\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr)/i,
       /(?:debited|withdrawn|spent).*?(?:by|of|for)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
     ]
 
@@ -162,7 +181,7 @@ function App() {
 
     const merchantPatterns = [
       /(?:at|@)\s+([A-Z][A-Za-z0-9\s&'.-]+?)\s+(?:on|dated|dt)\s+\d/i,
-      /(?:at|@|merchant|to)\s+([A-Z][A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\s+dt|\.|,|Rs|INR|USD|\$|LKR|EUR|GBP|for|card|a\/c)/i,
+      /(?:at|@)\s+([A-Z][A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\s+dt|\.|,|Rs|INR|USD|\$|LKR|EUR|GBP|for|card|a\/c)/i,
       /(?:merchant|store|shop|vendor):\s*([A-Za-z0-9\s&'.-]+?)(?:\.|,|on|card)/i,
       /(?:purchase|payment|txn)\s+(?:at|on|to)\s+([A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\.)/i,
     ]
@@ -182,7 +201,7 @@ function App() {
     if (!merchant) {
       const words = text.split(/\s+/).filter(word => 
         word.length > 2 && 
-        !word.match(/^(Rs|INR|USD|\$|€|£|₹|LKR|EUR|GBP|debited|credited|card|account|a\/c|xxxx|amt|avl|bal|ending|\*+|on|at|if|call|\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2})/i)
+        !word.match(/^(Rs|INR|USD|\$|€|£|₹|LKR|EUR|GBP|debited|credited|card|account|a\/c|xxxx|amt|avl|bal|ending|\*+|on|at|if|call|unauthorised|unauthorized|cc|\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2})/i)
       )
       const potentialMerchant = words.slice(0, 3).join(' ')
       merchant = potentialMerchant.length > 2 ? potentialMerchant : 'Transaction from SMS'
@@ -214,12 +233,86 @@ function App() {
     toast.success('Transaction details filled from SMS')
   }
 
+  const handleParseBatchSMS = () => {
+    if (!batchSmsText.trim()) {
+      toast.error('Please paste SMS messages')
+      return
+    }
+
+    const lines = batchSmsText.split('\n').filter(line => line.trim())
+    const parsed: Array<{amount: number, merchant: string}> = []
+
+    for (const line of lines) {
+      const { amount, merchant } = parseSMSTransaction(line)
+      if (amount > 0) {
+        parsed.push({ amount, merchant })
+      }
+    }
+
+    if (parsed.length === 0) {
+      toast.error('Could not parse any transactions from the messages')
+      return
+    }
+
+    setParsedTransactions(parsed)
+    toast.success(`Parsed ${parsed.length} transaction${parsed.length > 1 ? 's' : ''}`)
+  }
+
+  const handleAddBatchTransactions = (type: 'personal' | 'household') => {
+    if (parsedTransactions.length === 0) return
+
+    const newTransactions: Transaction[] = parsedTransactions.map((parsed, index) => ({
+      id: (Date.now() + index).toString(),
+      type,
+      amount: parsed.amount,
+      description: parsed.merchant,
+      date: new Date().toISOString(),
+    }))
+
+    setTransactions((current) => [...newTransactions, ...(current || [])])
+    setParsedTransactions([])
+    setBatchSmsText('')
+    setIsExpenseOpen(false)
+    toast.success(`Added ${newTransactions.length} ${type} expense${newTransactions.length > 1 ? 's' : ''}`)
+  }
+
   return (
     <div className="min-h-screen bg-background pb-safe">
       <div className="mx-auto max-w-2xl p-3 sm:p-6 space-y-4 sm:space-y-6">
-        <div className="space-y-1 sm:space-y-2">
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Shared Card Tracker</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">Track household vs personal expenses</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 sm:space-y-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Shared Card Tracker</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Track household vs personal expenses</p>
+          </div>
+          <Dialog open={isCurrencyOpen} onOpenChange={setIsCurrencyOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" className="shrink-0">
+                <CurrencyDollar weight="fill" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Select Currency</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 pt-4">
+                {(Object.keys(CURRENCY_SYMBOLS) as Currency[]).map((curr) => (
+                  <Button
+                    key={curr}
+                    variant={currency === curr ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setCurrency(curr)
+                      setIsCurrencyOpen(false)
+                      toast.success(`Currency set to ${curr}`)
+                    }}
+                  >
+                    <span className="font-bold mr-2">{CURRENCY_SYMBOLS[curr]}</span>
+                    {curr}
+                  </Button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <motion.div 
@@ -275,6 +368,8 @@ function App() {
             if (!open) {
               setActiveTab('manual')
               setSmsText('')
+              setBatchSmsText('')
+              setParsedTransactions([])
             }
           }}>
             <DialogTrigger asChild>
@@ -287,12 +382,16 @@ function App() {
               <DialogHeader>
                 <DialogTitle>Add Expense</DialogTitle>
               </DialogHeader>
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'sms')} className="pt-2">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'sms' | 'batch')} className="pt-2">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="manual">Manual</TabsTrigger>
                   <TabsTrigger value="sms">
-                    <ChatCircleText className="mr-1.5" weight="fill" size={16} />
-                    From SMS
+                    <ChatCircleText className="mr-1" weight="fill" size={16} />
+                    SMS
+                  </TabsTrigger>
+                  <TabsTrigger value="batch">
+                    <ListBullets className="mr-1" weight="fill" size={16} />
+                    Batch
                   </TabsTrigger>
                 </TabsList>
 
@@ -325,15 +424,78 @@ function App() {
                   <div className="rounded-lg bg-muted/50 p-3 space-y-2">
                     <p className="text-xs font-medium text-foreground">How to use:</p>
                     <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                      <li>Open your Messages app</li>
-                      <li>Find the transaction SMS from your bank</li>
-                      <li>Long-press the message and tap "Copy"</li>
-                      <li>Return here and paste it in the box above</li>
-                      <li>Tap "Parse SMS" to auto-fill the details</li>
+                      <li>Copy a single transaction SMS</li>
+                      <li>Paste it in the box above</li>
+                      <li>Tap "Parse SMS" to auto-fill details</li>
+                      <li>Switch to Manual tab to review and save</li>
                     </ol>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Supports multiple formats and currencies (LKR, ₹, Rs, $, €, £)
-                    </p>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="batch" className="space-y-3 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="batch-sms-text">Paste Multiple SMS Messages</Label>
+                    <Textarea
+                      id="batch-sms-text"
+                      placeholder="Paste multiple SMS messages here (one per line)&#10;&#10;Example:&#10;HSBC:TXN AUTH AMT LKR1344.20 AT PickMe...&#10;HSBC:TXN AUTH AMT LKR2000.00 AT LANKA FILLING..."
+                      value={batchSmsText}
+                      onChange={(e) => setBatchSmsText(e.target.value)}
+                      rows={8}
+                      className="resize-none text-sm font-mono"
+                    />
+                  </div>
+                  <Button onClick={handleParseBatchSMS} className="w-full" size="lg">
+                    Parse Messages
+                  </Button>
+                  
+                  {parsedTransactions.length > 0 && (
+                    <div className="space-y-3">
+                      <Separator />
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Found {parsedTransactions.length} transaction{parsedTransactions.length > 1 ? 's' : ''}</p>
+                        <ScrollArea className="h-[200px] rounded-md border p-3">
+                          <div className="space-y-2">
+                            {parsedTransactions.map((txn, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-sm p-2 rounded bg-muted/30">
+                                <span className="truncate flex-1 mr-2">{txn.merchant}</span>
+                                <span className="font-bold tabular-nums">{formatCurrency(txn.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Add all as:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleAddBatchTransactions('household')}
+                            className="h-auto py-3"
+                          >
+                            <House className="mr-1.5" weight="fill" size={16} />
+                            Household
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleAddBatchTransactions('personal')}
+                            className="h-auto py-3"
+                          >
+                            <User className="mr-1.5" weight="fill" size={16} />
+                            Personal
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+                    <p className="text-xs font-medium text-foreground">Batch import:</p>
+                    <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                      <li>Copy multiple SMS messages from your bank</li>
+                      <li>Paste them all at once (one per line)</li>
+                      <li>Tap "Parse Messages" to extract all transactions</li>
+                      <li>Review the list and add as Household or Personal</li>
+                    </ol>
                   </div>
                 </TabsContent>
 

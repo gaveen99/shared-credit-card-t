@@ -12,19 +12,26 @@ A shared credit card expense tracker that helps manage personal vs. household sp
 
 ## Essential Features
 
+### Currency Selection
+- **Functionality**: Allow users to select their preferred currency (USD, LKR, INR, EUR, GBP) with proper symbol and formatting
+- **Purpose**: Support international users and display amounts in their local currency
+- **Trigger**: User taps currency icon in header
+- **Progression**: Tap currency button → Select from list → All amounts immediately reformatted
+- **Success criteria**: Currency persists across sessions, all amounts display with correct symbol and formatting, supports common currencies including LKR for Sri Lanka
+
 ### Transaction Logging
-- **Functionality**: Record expenses as either "Personal" or "Household" with amount, description, and date - supports manual entry or SMS parsing
+- **Functionality**: Record expenses as either "Personal" or "Household" with amount, description, and date - supports manual entry, SMS parsing, or batch SMS import
 - **Purpose**: Maintain accurate records of all credit card usage to calculate proper settlements
 - **Trigger**: User taps "Add Expense" button
-- **Progression**: Select category (Personal/Household) → Enter amount manually OR paste SMS to auto-extract → Add description → Save → Updates balance display
-- **Success criteria**: Transaction appears in list, balance calculations update correctly, SMS parsing accurately extracts amount and merchant
+- **Progression**: Select category (Personal/Household) → Enter amount manually OR paste single SMS to auto-extract OR paste multiple SMS for batch import → Add description → Save → Updates balance display
+- **Success criteria**: Transaction appears in list, balance calculations update correctly, SMS parsing accurately extracts amount and merchant from various formats including HSBC, batch import processes multiple transactions efficiently
 
 ### SMS Transaction Import
-- **Functionality**: Parse transaction details from bank SMS messages by pasting the text with enhanced parsing patterns
-- **Purpose**: Eliminate manual data entry errors and speed up transaction logging
-- **Trigger**: User selects "From SMS" tab in Add Expense dialog
-- **Progression**: Copy bank SMS → Open app → Tap "Add Expense" → Switch to "From SMS" tab → Paste SMS text → Tap "Parse SMS" → Amount and merchant auto-filled → Select category → Save
-- **Success criteria**: Successfully extracts amounts in multiple formats (₹, Rs., INR, USD, $, €, £), identifies merchant names, handles various SMS formats from different banks, provides clear step-by-step instructions for first-time users
+- **Functionality**: Parse transaction details from bank SMS messages by pasting the text with enhanced parsing patterns that support HSBC and other bank formats, plus batch import for multiple messages
+- **Purpose**: Eliminate manual data entry errors and speed up transaction logging, especially for multiple transactions
+- **Trigger**: User selects "SMS" or "Batch" tab in Add Expense dialog
+- **Progression**: Copy bank SMS → Open app → Tap "Add Expense" → Switch to "SMS" tab for single or "Batch" tab for multiple → Paste SMS text → Tap "Parse SMS" or "Parse Messages" → Amount and merchant auto-filled or list shown → Select category → Save
+- **Success criteria**: Successfully extracts amounts in multiple formats (LKR, ₹, Rs., INR, USD, $, €, £), identifies merchant names, handles various SMS formats from different banks including HSBC format (AMT LKR1344.20 AT PickMe Food), batch processes multiple messages at once, provides clear step-by-step instructions for first-time users
 
 ### Cash Deposit Tracking
 - **Functionality**: Log when parents deposit cash to cover household expenses
@@ -34,11 +41,11 @@ A shared credit card expense tracker that helps manage personal vs. household sp
 - **Success criteria**: Deposit recorded, household balance reduced appropriately
 
 ### Balance Dashboard
-- **Functionality**: Display current state: total household expenses, total deposits received, net amount owed to/from parents
+- **Functionality**: Display current state: total household expenses, total deposits received, net amount owed to/from parents - all formatted in user's selected currency
 - **Purpose**: Provide instant clarity on financial position without manual calculation
 - **Trigger**: App launch or any transaction update
-- **Progression**: Auto-calculates on load → Shows three key numbers (household spent, deposits received, balance) → Color-codes status
-- **Success criteria**: Math is accurate, updates in real-time, visually distinguishes positive/negative balances
+- **Progression**: Auto-calculates on load → Shows three key numbers (household spent, deposits received, balance) → Color-codes status → Formats in selected currency
+- **Success criteria**: Math is accurate, updates in real-time, visually distinguishes positive/negative balances, properly displays currency symbols and formatting
 
 ### Transaction History
 - **Functionality**: Scrollable list of all transactions with filtering by type (All/Personal/Household/Deposits)
@@ -56,6 +63,9 @@ A shared credit card expense tracker that helps manage personal vs. household sp
 - **Quick Entry**: Auto-focus amount field when adding transaction for speed
 - **SMS Parse Failures**: Show clear error when amount cannot be extracted from SMS text
 - **Multiple Amounts in SMS**: Extract the primary transaction amount (first found)
+- **Batch Import**: Handle multiple SMS messages pasted at once, parsing each line separately
+- **HSBC Format Support**: Specifically handle HSBC bank SMS format (AMT LKR1344.20 AT Merchant)
+- **Currency Flexibility**: Support LKR, INR, USD, EUR, GBP with proper symbols and formatting
 - **Touch Targets**: All interactive elements at least 44×44 px for comfortable mobile use
 - **Small Screens**: Responsive layout adapts gracefully to phones and tablets
 - **Safe Areas**: Account for notches and device chrome on iOS/Android
@@ -126,6 +136,10 @@ Subtle and purposeful - primarily smooth number transitions when balances update
   - User (Personal expense)
   - Trash (Delete transaction)
   - Funnel (Filter)
+  - ChatCircleText (SMS parsing)
+  - ListBullets (Batch import)
+  - CurrencyDollar (Currency selector)
+  - X (Clear input)
   
 - **Spacing**: Generous padding (p-4 sm:p-6) on cards for breathing room, consistent gap-3 sm:gap-4 in forms, gap-2 sm:gap-3 in lists
 - **Mobile**: 
@@ -137,5 +151,7 @@ Subtle and purposeful - primarily smooth number transitions when balances update
   - Dialog max width constrained to viewport minus margin on mobile
   - Safe area insets for iPhone notch/home indicator
   - Numeric keyboard (inputMode="decimal") for amount fields
-  - SMS parsing tab interface for easy transaction import from text messages
+  - Three-tab interface for Manual/SMS/Batch entry modes
+  - Monospace font in batch SMS textarea for better readability
+  - Currency selector accessible from header
   - Smooth scrolling lists optimized for touch gestures
