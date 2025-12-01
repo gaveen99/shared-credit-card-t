@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 import { 
   Select,
   SelectContent,
@@ -25,7 +26,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, House, User, ArrowDown, Trash, Funnel } from '@phosphor-icons/react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Plus, House, User, ArrowDown, Trash, Funnel, ChatCircleText, X } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -52,6 +54,9 @@ function App() {
 
   const [depositAmount, setDepositAmount] = useState('')
   const [depositNote, setDepositNote] = useState('')
+  
+  const [smsText, setSmsText] = useState('')
+  const [activeTab, setActiveTab] = useState<'manual' | 'sms'>('manual')
 
   const householdTotal = (transactions || [])
     .filter(t => t.type === 'household')
@@ -137,54 +142,114 @@ function App() {
     }).format(date)
   }
 
+  const parseSMSTransaction = (text: string) => {
+    const patterns = [
+      /(?:spent|charged|purchase|paid|transaction|debited|withdrawn).*?(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+      /(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)\s*(?:spent|charged|purchase|paid|transaction|debited|withdrawn)/i,
+      /(?:amount|amt|txn).*?(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+      /(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+    ]
+
+    let amount = 0
+    for (const pattern of patterns) {
+      const match = text.match(pattern)
+      if (match) {
+        amount = parseFloat(match[1].replace(/,/g, ''))
+        break
+      }
+    }
+
+    const merchantPatterns = [
+      /(?:at|@|merchant|to)\s+([A-Z][A-Za-z0-9\s&'-]+?)(?:\s+on|\s+dated|\.|Rs|USD|\$|for|card)/i,
+      /(?:merchant|store|shop):\s*([A-Za-z0-9\s&'-]+)/i,
+    ]
+
+    let merchant = ''
+    for (const pattern of merchantPatterns) {
+      const match = text.match(pattern)
+      if (match) {
+        merchant = match[1].trim()
+        break
+      }
+    }
+
+    if (!merchant) {
+      const words = text.split(/\s+/)
+      const potentialMerchant = words.slice(0, 5).join(' ')
+      merchant = potentialMerchant.length > 50 ? 'Transaction from SMS' : potentialMerchant
+    }
+
+    return { amount, merchant }
+  }
+
+  const handleParseSMS = () => {
+    if (!smsText.trim()) {
+      toast.error('Please paste an SMS message')
+      return
+    }
+
+    const { amount, merchant } = parseSMSTransaction(smsText)
+
+    if (amount <= 0) {
+      toast.error('Could not find a valid amount in the SMS')
+      return
+    }
+
+    setExpenseAmount(amount.toString())
+    setExpenseDescription(merchant || 'Transaction from SMS')
+    setSmsText('')
+    setActiveTab('manual')
+    toast.success('Transaction details filled from SMS')
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl p-4 sm:p-6 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">Shared Card Tracker</h1>
-          <p className="text-sm text-muted-foreground">Track household vs personal expenses</p>
+    <div className="min-h-screen bg-background pb-safe">
+      <div className="mx-auto max-w-2xl p-3 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="space-y-1 sm:space-y-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Shared Card Tracker</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Track household vs personal expenses</p>
         </div>
 
         <motion.div 
-          className="grid gap-4"
+          className="grid gap-3 sm:gap-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className={`p-6 ${balance > 0 ? 'bg-gradient-to-br from-red-50 to-card' : balance < 0 ? 'bg-gradient-to-br from-emerald-50 to-card' : 'bg-card'}`}>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Current Balance</p>
-              <p className={`text-5xl font-bold tabular-nums tracking-tight ${
+          <Card className={`p-4 sm:p-6 ${balance > 0 ? 'bg-gradient-to-br from-red-50 to-card' : balance < 0 ? 'bg-gradient-to-br from-emerald-50 to-card' : 'bg-card'}`}>
+            <div className="space-y-1 sm:space-y-2">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Current Balance</p>
+              <p className={`text-3xl sm:text-5xl font-bold tabular-nums tracking-tight ${
                 balance > 0 ? 'text-destructive' : balance < 0 ? 'text-accent' : 'text-foreground'
               }`}>
                 {formatCurrency(Math.abs(balance))}
               </p>
-              <p className="text-sm font-medium text-muted-foreground">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                 {balance > 0 ? 'You should deposit to card' : balance < 0 ? 'Parents owe you' : 'All settled up'}
               </p>
             </div>
           </Card>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Card className="p-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <House className="text-destructive" weight="fill" />
-                  <p className="text-sm font-medium text-muted-foreground">Household Spent</p>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <Card className="p-4 sm:p-6">
+              <div className="space-y-1 sm:space-y-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <House className="text-destructive shrink-0" weight="fill" size={18} />
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Household Spent</p>
                 </div>
-                <p className="text-3xl font-bold tabular-nums text-destructive">
+                <p className="text-xl sm:text-3xl font-bold tabular-nums text-destructive">
                   {formatCurrency(householdTotal)}
                 </p>
               </div>
             </Card>
 
-            <Card className="p-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ArrowDown className="text-accent" weight="fill" />
-                  <p className="text-sm font-medium text-muted-foreground">Deposits Received</p>
+            <Card className="p-4 sm:p-6">
+              <div className="space-y-1 sm:space-y-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <ArrowDown className="text-accent shrink-0" weight="fill" size={18} />
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Deposits Received</p>
                 </div>
-                <p className="text-3xl font-bold tabular-nums text-accent">
+                <p className="text-xl sm:text-3xl font-bold tabular-nums text-accent">
                   {formatCurrency(depositsTotal)}
                 </p>
               </div>
@@ -192,81 +257,130 @@ function App() {
           </div>
         </motion.div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Dialog open={isExpenseOpen} onOpenChange={setIsExpenseOpen}>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <Dialog open={isExpenseOpen} onOpenChange={(open) => {
+            setIsExpenseOpen(open)
+            if (!open) {
+              setActiveTab('manual')
+              setSmsText('')
+            }
+          }}>
             <DialogTrigger asChild>
-              <Button className="flex-1" size="lg">
-                <Plus className="mr-2" />
+              <Button className="flex-1 h-12 sm:h-11" size="lg">
+                <Plus className="mr-2" weight="bold" />
                 Add Expense
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Expense</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      type="button"
-                      variant={expenseType === 'household' ? 'default' : 'outline'}
-                      onClick={() => setExpenseType('household')}
-                      className="h-auto py-4"
-                    >
-                      <House className="mr-2" weight="fill" />
-                      Household
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={expenseType === 'personal' ? 'default' : 'outline'}
-                      onClick={() => setExpenseType('personal')}
-                      className="h-auto py-4"
-                    >
-                      <User className="mr-2" weight="fill" />
-                      Personal
-                    </Button>
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'sms')} className="pt-2">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                  <TabsTrigger value="sms">
+                    <ChatCircleText className="mr-1.5" weight="fill" size={16} />
+                    From SMS
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="sms" className="space-y-3 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="sms-text">Paste Transaction SMS</Label>
+                    <Textarea
+                      id="sms-text"
+                      placeholder="Paste your bank SMS here, e.g., 'Rs.1,250 spent at Amazon on Card ending 1234'"
+                      value={smsText}
+                      onChange={(e) => setSmsText(e.target.value)}
+                      rows={6}
+                      className="resize-none text-sm"
+                    />
                   </div>
-                </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleParseSMS} className="flex-1" size="lg">
+                      Parse SMS
+                    </Button>
+                    {smsText && (
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => setSmsText('')}
+                      >
+                        <X />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Copy and paste transaction SMS from your bank. We'll automatically extract the amount and merchant details.
+                  </p>
+                </TabsContent>
 
-                <div className="space-y-2">
-                  <Label htmlFor="expense-amount">Amount</Label>
-                  <Input
-                    id="expense-amount"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    autoFocus
-                  />
-                </div>
+                <TabsContent value="manual" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      <Button
+                        type="button"
+                        variant={expenseType === 'household' ? 'default' : 'outline'}
+                        onClick={() => setExpenseType('household')}
+                        className="h-auto py-3 sm:py-4"
+                      >
+                        <House className="mr-1.5 sm:mr-2" weight="fill" size={18} />
+                        Household
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={expenseType === 'personal' ? 'default' : 'outline'}
+                        onClick={() => setExpenseType('personal')}
+                        className="h-auto py-3 sm:py-4"
+                      >
+                        <User className="mr-1.5 sm:mr-2" weight="fill" size={18} />
+                        Personal
+                      </Button>
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="expense-description">Description</Label>
-                  <Input
-                    id="expense-description"
-                    placeholder="What was this for?"
-                    value={expenseDescription}
-                    onChange={(e) => setExpenseDescription(e.target.value)}
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expense-amount">Amount</Label>
+                    <Input
+                      id="expense-amount"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={expenseAmount}
+                      onChange={(e) => setExpenseAmount(e.target.value)}
+                      className="text-base"
+                      inputMode="decimal"
+                    />
+                  </div>
 
-                <Button onClick={handleAddExpense} className="w-full" size="lg">
-                  Add Expense
-                </Button>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expense-description">Description</Label>
+                    <Input
+                      id="expense-description"
+                      placeholder="What was this for?"
+                      value={expenseDescription}
+                      onChange={(e) => setExpenseDescription(e.target.value)}
+                      className="text-base"
+                    />
+                  </div>
+
+                  <Button onClick={handleAddExpense} className="w-full" size="lg">
+                    Add Expense
+                  </Button>
+                </TabsContent>
+              </Tabs>
             </DialogContent>
           </Dialog>
 
           <Dialog open={isDepositOpen} onOpenChange={setIsDepositOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex-1" size="lg">
+              <Button variant="outline" className="flex-1 h-12 sm:h-11" size="lg">
                 <ArrowDown className="mr-2" weight="fill" />
                 Add Deposit
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Record Cash Deposit</DialogTitle>
               </DialogHeader>
@@ -280,7 +394,8 @@ function App() {
                     placeholder="0.00"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
-                    autoFocus
+                    className="text-base"
+                    inputMode="decimal"
                   />
                 </div>
 
@@ -291,6 +406,7 @@ function App() {
                     placeholder="Add a note"
                     value={depositNote}
                     onChange={(e) => setDepositNote(e.target.value)}
+                    className="text-base"
                   />
                 </div>
 
@@ -302,14 +418,14 @@ function App() {
           </Dialog>
         </div>
 
-        <Separator />
+        <Separator className="my-4 sm:my-6" />
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Transaction History</h2>
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg sm:text-xl font-semibold">Transaction History</h2>
             <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-              <SelectTrigger className="w-[160px]">
-                <Funnel className="mr-2" />
+              <SelectTrigger className="w-[140px] sm:w-[160px]">
+                <Funnel className="mr-1.5 sm:mr-2" size={16} />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -322,15 +438,15 @@ function App() {
           </div>
 
           {(transactions || []).length === 0 ? (
-            <Card className="p-12">
+            <Card className="p-8 sm:p-12">
               <div className="text-center space-y-2">
-                <p className="text-lg font-medium text-muted-foreground">No transactions yet</p>
-                <p className="text-sm text-muted-foreground">Add an expense or deposit to get started</p>
+                <p className="text-base sm:text-lg font-medium text-muted-foreground">No transactions yet</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Add an expense or deposit to get started</p>
               </div>
             </Card>
           ) : (
-            <ScrollArea className="h-[500px] rounded-md border">
-              <div className="p-4 space-y-3">
+            <ScrollArea className="h-[400px] sm:h-[500px] rounded-md border">
+              <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
                 <AnimatePresence initial={false}>
                   {filteredTransactions.map((transaction) => (
                     <motion.div
@@ -340,36 +456,36 @@ function App() {
                       exit={{ opacity: 0, x: 20 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <Card className={`p-4 border-l-4 ${
+                      <Card className={`p-3 sm:p-4 border-l-4 ${
                         transaction.type === 'household' ? 'border-l-destructive' :
                         transaction.type === 'personal' ? 'border-l-primary' :
                         'border-l-accent'
                       }`}>
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2">
+                        <div className="flex items-start justify-between gap-2 sm:gap-4">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center gap-1.5 sm:gap-2">
                               {transaction.type === 'household' && (
-                                <House className="text-destructive" weight="fill" size={18} />
+                                <House className="text-destructive shrink-0" weight="fill" size={16} />
                               )}
                               {transaction.type === 'personal' && (
-                                <User className="text-primary" weight="fill" size={18} />
+                                <User className="text-primary shrink-0" weight="fill" size={16} />
                               )}
                               {transaction.type === 'deposit' && (
-                                <ArrowDown className="text-accent" weight="fill" size={18} />
+                                <ArrowDown className="text-accent shrink-0" weight="fill" size={16} />
                               )}
                               <Badge variant={
                                 transaction.type === 'household' ? 'destructive' :
                                 transaction.type === 'deposit' ? 'default' :
                                 'secondary'
-                              }>
+                              } className="text-xs">
                                 {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
                               </Badge>
                             </div>
-                            <p className="font-medium">{transaction.description}</p>
-                            <p className="text-sm text-muted-foreground">{formatDate(transaction.date)}</p>
+                            <p className="font-medium text-sm sm:text-base truncate">{transaction.description}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">{formatDate(transaction.date)}</p>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <p className={`text-lg font-bold tabular-nums ${
+                          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+                            <p className={`text-base sm:text-lg font-bold tabular-nums ${
                               transaction.type === 'deposit' ? 'text-accent' : 'text-foreground'
                             }`}>
                               {transaction.type === 'deposit' ? '+' : ''}{formatCurrency(transaction.amount)}
@@ -378,9 +494,9 @@ function App() {
                               variant="ghost"
                               size="icon"
                               onClick={() => setDeleteId(transaction.id)}
-                              className="text-muted-foreground hover:text-destructive"
+                              className="text-muted-foreground hover:text-destructive h-8 w-8 sm:h-10 sm:w-10"
                             >
-                              <Trash />
+                              <Trash size={18} />
                             </Button>
                           </div>
                         </div>
@@ -395,15 +511,15 @@ function App() {
       </div>
 
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete this transaction.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="m-0">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteId && handleDeleteTransaction(deleteId)}>
               Delete
             </AlertDialogAction>

@@ -13,11 +13,18 @@ A shared credit card expense tracker that helps manage personal vs. household sp
 ## Essential Features
 
 ### Transaction Logging
-- **Functionality**: Record expenses as either "Personal" or "Household" with amount, description, and date
+- **Functionality**: Record expenses as either "Personal" or "Household" with amount, description, and date - supports manual entry or SMS parsing
 - **Purpose**: Maintain accurate records of all credit card usage to calculate proper settlements
 - **Trigger**: User taps "Add Expense" button
-- **Progression**: Select category (Personal/Household) → Enter amount → Add description → Save → Updates balance display
-- **Success criteria**: Transaction appears in list, balance calculations update correctly
+- **Progression**: Select category (Personal/Household) → Enter amount manually OR paste SMS to auto-extract → Add description → Save → Updates balance display
+- **Success criteria**: Transaction appears in list, balance calculations update correctly, SMS parsing accurately extracts amount and merchant
+
+### SMS Transaction Import
+- **Functionality**: Parse transaction details from bank SMS messages by pasting the text
+- **Purpose**: Eliminate manual data entry errors and speed up transaction logging
+- **Trigger**: User selects "From SMS" tab in Add Expense dialog
+- **Progression**: Copy bank SMS → Open app → Tap "Add Expense" → Switch to "From SMS" tab → Paste SMS text → Tap "Parse SMS" → Amount and merchant auto-filled → Select category → Save
+- **Success criteria**: Successfully extracts amounts in multiple formats (Rs., USD, $, €, £), identifies merchant names, handles various SMS formats from different banks
 
 ### Cash Deposit Tracking
 - **Functionality**: Log when parents deposit cash to cover household expenses
@@ -47,6 +54,11 @@ A shared credit card expense tracker that helps manage personal vs. household sp
 - **Accidental Entries**: Allow deletion of transactions with confirmation dialog
 - **Large Numbers**: Format currency properly with commas for readability
 - **Quick Entry**: Auto-focus amount field when adding transaction for speed
+- **SMS Parse Failures**: Show clear error when amount cannot be extracted from SMS text
+- **Multiple Amounts in SMS**: Extract the primary transaction amount (first found)
+- **Touch Targets**: All interactive elements at least 44×44 px for comfortable mobile use
+- **Small Screens**: Responsive layout adapts gracefully to phones and tablets
+- **Safe Areas**: Account for notches and device chrome on iOS/Android
 
 ## Design Direction
 
@@ -115,5 +127,15 @@ Subtle and purposeful - primarily smooth number transitions when balances update
   - Trash (Delete transaction)
   - Funnel (Filter)
   
-- **Spacing**: Generous padding (p-6) on cards for breathing room, consistent gap-4 in forms, gap-3 in lists
-- **Mobile**: Single column layout, full-width cards, sticky balance header on scroll, bottom sheet for transaction entry on mobile
+- **Spacing**: Generous padding (p-4 sm:p-6) on cards for breathing room, consistent gap-3 sm:gap-4 in forms, gap-2 sm:gap-3 in lists
+- **Mobile**: 
+  - Optimized for iOS and Android with proper viewport settings
+  - Single column layout on mobile, 2-column grid on larger screens
+  - Full-width cards with reduced padding on mobile (p-4 instead of p-6)
+  - Touch-friendly button heights (h-12 on mobile, h-11 on desktop)
+  - Responsive text sizes (text-xl/2xl for headings, text-xs/sm for labels)
+  - Dialog max width constrained to viewport minus margin on mobile
+  - Safe area insets for iPhone notch/home indicator
+  - Numeric keyboard (inputMode="decimal") for amount fields
+  - SMS parsing tab interface for easy transaction import from text messages
+  - Smooth scrolling lists optimized for touch gestures
