@@ -163,6 +163,7 @@ function App() {
 
   const parseSMSTransaction = (text: string) => {
     const patterns = [
+      /(?:LKR|INR|USD|EUR|GBP|RS\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)\s+(?:debited|credited)/i,
       /(?:AMT|AMOUNT)\s+(?:LKR|INR|USD|EUR|GBP|RS\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
       /(?:LKR|INR|USD|EUR|GBP|RS\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
       /(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr).*?(?:Rs\.?|INR|USD|\$|€|£|₹|LKR)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
@@ -180,6 +181,7 @@ function App() {
     }
 
     const merchantPatterns = [
+      /(?:debited|credited).*?for\s+([A-Za-z][A-Za-z0-9\s&'.-]+?)(?:\s*-|\s*For\s+Inq|\s*$)/i,
       /(?:at|@)\s+([A-Z][A-Za-z0-9\s&'.-]+?)\s+(?:on|dated|dt)\s+\d/i,
       /(?:at|@)\s+([A-Z][A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\s+dt|\.|,|Rs|INR|USD|\$|LKR|EUR|GBP|for|card|a\/c)/i,
       /(?:merchant|store|shop|vendor):\s*([A-Za-z0-9\s&'.-]+?)(?:\.|,|on|card)/i,
@@ -201,7 +203,7 @@ function App() {
     if (!merchant) {
       const words = text.split(/\s+/).filter(word => 
         word.length > 2 && 
-        !word.match(/^(Rs|INR|USD|\$|€|£|₹|LKR|EUR|GBP|debited|credited|card|account|a\/c|xxxx|amt|avl|bal|ending|\*+|on|at|if|call|unauthorised|unauthorized|cc|\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2})/i)
+        !word.match(/^(Rs|INR|USD|\$|€|£|₹|LKR|EUR|GBP|debited|credited|card|account|a\/c|AC|\*+\d+|xxxx|amt|avl|bal|ending|on|at|if|call|for|inq|bank|sampath|unauthorised|unauthorized|cc|\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}|0112)/i)
       )
       const potentialMerchant = words.slice(0, 3).join(' ')
       merchant = potentialMerchant.length > 2 ? potentialMerchant : 'Transaction from SMS'
@@ -239,11 +241,40 @@ function App() {
       return
     }
 
-    const lines = batchSmsText.split('\n').filter(line => line.trim())
+    const lines = batchSmsText.split('\n')
     const parsed: Array<{amount: number, merchant: string, type: 'personal' | 'household'}> = []
-
-    for (const line of lines) {
-      const { amount, merchant } = parseSMSTransaction(line)
+    
+    let currentMessage = ''
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      
+      if (!line) {
+        if (currentMessage) {
+          const { amount, merchant } = parseSMSTransaction(currentMessage)
+          if (amount > 0) {
+            parsed.push({ amount, merchant, type: 'household' })
+          }
+          currentMessage = ''
+        }
+        continue
+      }
+      
+      if (line.match(/^(LKR|INR|USD|EUR|GBP|Rs\.?|\$|€|£|₹)/i)) {
+        if (currentMessage) {
+          const { amount, merchant } = parseSMSTransaction(currentMessage)
+          if (amount > 0) {
+            parsed.push({ amount, merchant, type: 'household' })
+          }
+        }
+        currentMessage = line
+      } else {
+        currentMessage += ' ' + line
+      }
+    }
+    
+    if (currentMessage) {
+      const { amount, merchant } = parseSMSTransaction(currentMessage)
       if (amount > 0) {
         parsed.push({ amount, merchant, type: 'household' })
       }
