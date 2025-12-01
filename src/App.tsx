@@ -144,10 +144,10 @@ function App() {
 
   const parseSMSTransaction = (text: string) => {
     const patterns = [
+      /(?:amt|amount)\s+(?:lkr|inr|usd|eur|gbp|rs\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:lkr|inr|usd|eur|gbp|rs\.?|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
       /(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr).*?(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
       /(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr)/i,
-      /(?:amount|amt|txn|value).*?(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
-      /(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
       /(?:debited|withdrawn|spent).*?(?:by|of|for)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
     ]
 
@@ -161,7 +161,8 @@ function App() {
     }
 
     const merchantPatterns = [
-      /(?:at|@|merchant|to|on)\s+([A-Z][A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\s+dt|\.|,|Rs|INR|USD|\$|for|card|a\/c)/i,
+      /(?:at|@)\s+([A-Z][A-Za-z0-9\s&'.-]+?)\s+(?:on|dated|dt)\s+\d/i,
+      /(?:at|@|merchant|to)\s+([A-Z][A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\s+dt|\.|,|Rs|INR|USD|\$|LKR|EUR|GBP|for|card|a\/c)/i,
       /(?:merchant|store|shop|vendor):\s*([A-Za-z0-9\s&'.-]+?)(?:\.|,|on|card)/i,
       /(?:purchase|payment|txn)\s+(?:at|on|to)\s+([A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\.)/i,
     ]
@@ -181,7 +182,7 @@ function App() {
     if (!merchant) {
       const words = text.split(/\s+/).filter(word => 
         word.length > 2 && 
-        !word.match(/^(Rs|INR|USD|\$|€|£|₹|debited|credited|card|account|a\/c|xxxx)/i)
+        !word.match(/^(Rs|INR|USD|\$|€|£|₹|LKR|EUR|GBP|debited|credited|card|account|a\/c|xxxx|amt|avl|bal|ending|\*+|on|at|if|call|\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2})/i)
       )
       const potentialMerchant = words.slice(0, 3).join(' ')
       merchant = potentialMerchant.length > 2 ? potentialMerchant : 'Transaction from SMS'
@@ -331,7 +332,7 @@ function App() {
                       <li>Tap "Parse SMS" to auto-fill the details</li>
                     </ol>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Supports multiple formats and currencies (₹, Rs, $, €, £)
+                      Supports multiple formats and currencies (LKR, ₹, Rs, $, €, £)
                     </p>
                   </div>
                 </TabsContent>
