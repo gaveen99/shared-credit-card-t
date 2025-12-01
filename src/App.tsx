@@ -68,7 +68,7 @@ function App() {
   
   const [smsText, setSmsText] = useState('')
   const [activeTab, setActiveTab] = useState<'manual' | 'sms' | 'batch'>('manual')
-  const [parsedTransactions, setParsedTransactions] = useState<Array<{amount: number, merchant: string}>>([])
+  const [parsedTransactions, setParsedTransactions] = useState<Array<{amount: number, merchant: string, type: 'personal' | 'household'}>>([])
   const [batchSmsText, setBatchSmsText] = useState('')
 
   const householdTotal = (transactions || [])
@@ -240,12 +240,12 @@ function App() {
     }
 
     const lines = batchSmsText.split('\n').filter(line => line.trim())
-    const parsed: Array<{amount: number, merchant: string}> = []
+    const parsed: Array<{amount: number, merchant: string, type: 'personal' | 'household'}> = []
 
     for (const line of lines) {
       const { amount, merchant } = parseSMSTransaction(line)
       if (amount > 0) {
-        parsed.push({ amount, merchant })
+        parsed.push({ amount, merchant, type: 'household' })
       }
     }
 
@@ -258,12 +258,20 @@ function App() {
     toast.success(`Parsed ${parsed.length} transaction${parsed.length > 1 ? 's' : ''}`)
   }
 
-  const handleAddBatchTransactions = (type: 'personal' | 'household') => {
+  const handleToggleBatchType = (index: number) => {
+    setParsedTransactions((current) =>
+      current.map((txn, idx) =>
+        idx === index ? { ...txn, type: txn.type === 'household' ? 'personal' as const : 'household' as const } : txn
+      )
+    )
+  }
+
+  const handleAddBatchTransactions = () => {
     if (parsedTransactions.length === 0) return
 
     const newTransactions: Transaction[] = parsedTransactions.map((parsed, index) => ({
       id: (Date.now() + index).toString(),
-      type,
+      type: parsed.type,
       amount: parsed.amount,
       description: parsed.merchant,
       date: new Date().toISOString(),
@@ -273,7 +281,7 @@ function App() {
     setParsedTransactions([])
     setBatchSmsText('')
     setIsExpenseOpen(false)
-    toast.success(`Added ${newTransactions.length} ${type} expense${newTransactions.length > 1 ? 's' : ''}`)
+    toast.success(`Added ${newTransactions.length} expense${newTransactions.length > 1 ? 's' : ''}`)
   }
 
   return (
@@ -456,35 +464,29 @@ function App() {
                         <ScrollArea className="h-[200px] rounded-md border p-3">
                           <div className="space-y-2">
                             {parsedTransactions.map((txn, idx) => (
-                              <div key={idx} className="flex justify-between items-center text-sm p-2 rounded bg-muted/30">
-                                <span className="truncate flex-1 mr-2">{txn.merchant}</span>
-                                <span className="font-bold tabular-nums">{formatCurrency(txn.amount)}</span>
+                              <div key={idx} className="flex items-center gap-2 text-sm p-2 rounded bg-muted/30">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleToggleBatchType(idx)}
+                                  className="shrink-0 h-8 px-2"
+                                >
+                                  {txn.type === 'household' ? (
+                                    <House weight="fill" size={16} className="text-destructive" />
+                                  ) : (
+                                    <User weight="fill" size={16} className="text-primary" />
+                                  )}
+                                </Button>
+                                <span className="truncate flex-1 text-xs">{txn.merchant}</span>
+                                <span className="font-bold tabular-nums text-xs">{formatCurrency(txn.amount)}</span>
                               </div>
                             ))}
                           </div>
                         </ScrollArea>
                       </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Add all as:</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => handleAddBatchTransactions('household')}
-                            className="h-auto py-3"
-                          >
-                            <House className="mr-1.5" weight="fill" size={16} />
-                            Household
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleAddBatchTransactions('personal')}
-                            className="h-auto py-3"
-                          >
-                            <User className="mr-1.5" weight="fill" size={16} />
-                            Personal
-                          </Button>
-                        </div>
-                      </div>
+                      <Button onClick={handleAddBatchTransactions} className="w-full" size="lg">
+                        Add All {parsedTransactions.length} Transaction{parsedTransactions.length > 1 ? 's' : ''}
+                      </Button>
                     </div>
                   )}
 
@@ -494,7 +496,8 @@ function App() {
                       <li>Copy multiple SMS messages from your bank</li>
                       <li>Paste them all at once (one per line)</li>
                       <li>Tap "Parse Messages" to extract all transactions</li>
-                      <li>Review the list and add as Household or Personal</li>
+                      <li>Tap each category icon to toggle between Household and Personal</li>
+                      <li>Tap "Add All" to save all transactions</li>
                     </ol>
                   </div>
                 </TabsContent>
