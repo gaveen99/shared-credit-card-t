@@ -20,11 +20,11 @@ A shared credit card expense tracker that helps manage personal vs. household sp
 - **Success criteria**: Transaction appears in list, balance calculations update correctly, SMS parsing accurately extracts amount and merchant
 
 ### SMS Transaction Import
-- **Functionality**: Parse transaction details from bank SMS messages by pasting the text
+- **Functionality**: Parse transaction details from bank SMS messages by pasting the text with enhanced parsing patterns
 - **Purpose**: Eliminate manual data entry errors and speed up transaction logging
 - **Trigger**: User selects "From SMS" tab in Add Expense dialog
 - **Progression**: Copy bank SMS → Open app → Tap "Add Expense" → Switch to "From SMS" tab → Paste SMS text → Tap "Parse SMS" → Amount and merchant auto-filled → Select category → Save
-- **Success criteria**: Successfully extracts amounts in multiple formats (Rs., USD, $, €, £), identifies merchant names, handles various SMS formats from different banks
+- **Success criteria**: Successfully extracts amounts in multiple formats (₹, Rs., INR, USD, $, €, £), identifies merchant names, handles various SMS formats from different banks, provides clear step-by-step instructions for first-time users
 
 ### Cash Deposit Tracking
 - **Functionality**: Log when parents deposit cash to cover household expenses

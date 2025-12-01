@@ -144,10 +144,11 @@ function App() {
 
   const parseSMSTransaction = (text: string) => {
     const patterns = [
-      /(?:spent|charged|purchase|paid|transaction|debited|withdrawn).*?(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
-      /(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)\s*(?:spent|charged|purchase|paid|transaction|debited|withdrawn)/i,
-      /(?:amount|amt|txn).*?(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
-      /(?:Rs\.?|USD|\$|€|£)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+      /(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr).*?(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:spent|charged|purchase|paid|transaction|debited|withdrawn|debit|dr)/i,
+      /(?:amount|amt|txn|value).*?(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:Rs\.?|INR|USD|\$|€|£|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
+      /(?:debited|withdrawn|spent).*?(?:by|of|for)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i,
     ]
 
     let amount = 0
@@ -160,8 +161,9 @@ function App() {
     }
 
     const merchantPatterns = [
-      /(?:at|@|merchant|to)\s+([A-Z][A-Za-z0-9\s&'-]+?)(?:\s+on|\s+dated|\.|Rs|USD|\$|for|card)/i,
-      /(?:merchant|store|shop):\s*([A-Za-z0-9\s&'-]+)/i,
+      /(?:at|@|merchant|to|on)\s+([A-Z][A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\s+dt|\.|,|Rs|INR|USD|\$|for|card|a\/c)/i,
+      /(?:merchant|store|shop|vendor):\s*([A-Za-z0-9\s&'.-]+?)(?:\.|,|on|card)/i,
+      /(?:purchase|payment|txn)\s+(?:at|on|to)\s+([A-Za-z0-9\s&'.-]+?)(?:\s+on|\s+dated|\.)/i,
     ]
 
     let merchant = ''
@@ -169,14 +171,23 @@ function App() {
       const match = text.match(pattern)
       if (match) {
         merchant = match[1].trim()
+        if (merchant.length > 40) {
+          merchant = merchant.substring(0, 40) + '...'
+        }
         break
       }
     }
 
     if (!merchant) {
-      const words = text.split(/\s+/)
-      const potentialMerchant = words.slice(0, 5).join(' ')
-      merchant = potentialMerchant.length > 50 ? 'Transaction from SMS' : potentialMerchant
+      const words = text.split(/\s+/).filter(word => 
+        word.length > 2 && 
+        !word.match(/^(Rs|INR|USD|\$|€|£|₹|debited|credited|card|account|a\/c|xxxx)/i)
+      )
+      const potentialMerchant = words.slice(0, 3).join(' ')
+      merchant = potentialMerchant.length > 2 ? potentialMerchant : 'Transaction from SMS'
+      if (merchant.length > 40) {
+        merchant = merchant.substring(0, 40)
+      }
     }
 
     return { amount, merchant }
@@ -310,9 +321,19 @@ function App() {
                       </Button>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Copy and paste transaction SMS from your bank. We'll automatically extract the amount and merchant details.
-                  </p>
+                  <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+                    <p className="text-xs font-medium text-foreground">How to use:</p>
+                    <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                      <li>Open your Messages app</li>
+                      <li>Find the transaction SMS from your bank</li>
+                      <li>Long-press the message and tap "Copy"</li>
+                      <li>Return here and paste it in the box above</li>
+                      <li>Tap "Parse SMS" to auto-fill the details</li>
+                    </ol>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Supports multiple formats and currencies (₹, Rs, $, €, £)
+                    </p>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="manual" className="space-y-4 mt-4">
