@@ -1,5 +1,5 @@
 import { useKV } from '@github/spark/hooks'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import { 
   Select,
   SelectContent,
@@ -27,7 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, House, User, ArrowDown, Trash, Funnel, ChatCircleText, X, CurrencyDollar, ListBullets } from '@phosphor-icons/react'
+import { Plus, House, User, ArrowDown, Trash, Funnel, ChatCircleText, X, CurrencyDollar, ListBullets, Bell, Gear } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -53,11 +54,15 @@ const CURRENCY_SYMBOLS: Record<Currency, string> = {
 function App() {
   const [transactions, setTransactions] = useKV<Transaction[]>('transactions', [])
   const [currency, setCurrency] = useKV<Currency>('currency', 'LKR')
+  const [notificationsEnabled, setNotificationsEnabled] = useKV<boolean>('notifications-enabled', false)
+  const [balanceThreshold, setBalanceThreshold] = useKV<number>('balance-threshold', 5000)
   const [isExpenseOpen, setIsExpenseOpen] = useState(false)
   const [isDepositOpen, setIsDepositOpen] = useState(false)
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [filter, setFilter] = useState<'all' | TransactionType>('all')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [tempThreshold, setTempThreshold] = useState(balanceThreshold?.toString() || '5000')
 
   const [expenseType, setExpenseType] = useState<'personal' | 'household'>('household')
   const [expenseAmount, setExpenseAmount] = useState('')
@@ -80,6 +85,61 @@ function App() {
     .reduce((sum, t) => sum + t.amount, 0)
 
   const balance = householdTotal - depositsTotal
+
+  useEffect(() => {
+    if (notificationsEnabled && balance > (balanceThreshold || 0)) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Shared Card Tracker', {
+          body: `Balance exceeded ${formatCurrency(balanceThreshold || 0)}! Current: ${formatCurrency(balance)}`,
+          icon: '/icon.png',
+          badge: '/icon.png',
+        })
+      }
+      toast.error(`Balance Alert: You should deposit ${formatCurrency(balance)} to the card`, {
+        duration: 8000,
+      })
+    }
+  }, [balance, notificationsEnabled, balanceThreshold])
+
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        setNotificationsEnabled(true)
+        toast.success('Notifications enabled')
+      } else {
+        toast.error('Notification permission denied')
+      }
+    } else {
+      toast.error('Notifications not supported in this browser')
+    }
+  }
+
+  const handleToggleNotifications = async (enabled: boolean) => {
+    if (enabled) {
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        await requestNotificationPermission()
+      } else if (Notification.permission === 'granted') {
+        setNotificationsEnabled(true)
+        toast.success('Notifications enabled')
+      } else {
+        await requestNotificationPermission()
+      }
+    } else {
+      setNotificationsEnabled(false)
+      toast.success('Notifications disabled')
+    }
+  }
+
+  const handleSaveThreshold = () => {
+    const threshold = parseFloat(tempThreshold)
+    if (isNaN(threshold) || threshold <= 0) {
+      toast.error('Please enter a valid threshold amount')
+      return
+    }
+    setBalanceThreshold(threshold)
+    toast.success('Threshold updated')
+  }
 
   const handleAddExpense = () => {
     const amount = parseFloat(expenseAmount)
@@ -323,35 +383,108 @@ function App() {
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">Shared Card Tracker</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Track household vs personal expenses</p>
           </div>
-          <Dialog open={isCurrencyOpen} onOpenChange={setIsCurrencyOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0">
-                <CurrencyDollar weight="fill" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Select Currency</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-2 pt-4">
-                {(Object.keys(CURRENCY_SYMBOLS) as Currency[]).map((curr) => (
-                  <Button
-                    key={curr}
-                    variant={currency === curr ? 'default' : 'outline'}
-                    className="w-full justify-start"
-                    onClick={() => {
-                      setCurrency(curr)
-                      setIsCurrencyOpen(false)
-                      toast.success(`Currency set to ${curr}`)
-                    }}
-                  >
-                    <span className="font-bold mr-2">{CURRENCY_SYMBOLS[curr]}</span>
-                    {curr}
-                  </Button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-2">
+            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" className="shrink-0 relative">
+                  <Gear weight="fill" />
+                  {notificationsEnabled && balance > (balanceThreshold || 0) && (
+                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full animate-pulse" />
+                  )}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Notification Settings</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6 pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="notifications-toggle" className="text-base">
+                        Enable Notifications
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Get alerts when balance exceeds threshold
+                      </p>
+                    </div>
+                    <Switch
+                      id="notifications-toggle"
+                      checked={notificationsEnabled || false}
+                      onCheckedChange={handleToggleNotifications}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <Label htmlFor="threshold-amount">Balance Threshold</Label>
+                    <p className="text-sm text-muted-foreground">
+                      You'll be notified when your balance exceeds this amount
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        id="threshold-amount"
+                        type="number"
+                        step="100"
+                        placeholder="5000"
+                        value={tempThreshold}
+                        onChange={(e) => setTempThreshold(e.target.value)}
+                        className="text-base"
+                        inputMode="numeric"
+                      />
+                      <Button onClick={handleSaveThreshold} variant="secondary">
+                        Save
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Current threshold: {formatCurrency(balanceThreshold || 0)}
+                    </p>
+                  </div>
+
+                  {notificationsEnabled && (
+                    <div className="rounded-lg bg-accent/10 border border-accent/20 p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Bell className="text-accent" weight="fill" size={18} />
+                        <p className="text-sm font-medium text-accent-foreground">Notifications Active</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        You'll receive alerts when your balance exceeds {formatCurrency(balanceThreshold || 0)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isCurrencyOpen} onOpenChange={setIsCurrencyOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" className="shrink-0">
+                  <CurrencyDollar weight="fill" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Select Currency</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2 pt-4">
+                  {(Object.keys(CURRENCY_SYMBOLS) as Currency[]).map((curr) => (
+                    <Button
+                      key={curr}
+                      variant={currency === curr ? 'default' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setCurrency(curr)
+                        setIsCurrencyOpen(false)
+                        toast.success(`Currency set to ${curr}`)
+                      }}
+                    >
+                      <span className="font-bold mr-2">{CURRENCY_SYMBOLS[curr]}</span>
+                      {curr}
+                    </Button>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <motion.div 
@@ -362,7 +495,15 @@ function App() {
         >
           <Card className={`p-4 sm:p-6 ${balance > 0 ? 'bg-gradient-to-br from-red-50 to-card' : balance < 0 ? 'bg-gradient-to-br from-emerald-50 to-card' : 'bg-card'}`}>
             <div className="space-y-1 sm:space-y-2">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Current Balance</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Current Balance</p>
+                {notificationsEnabled && balance > (balanceThreshold || 0) && (
+                  <Badge variant="destructive" className="gap-1 animate-pulse">
+                    <Bell weight="fill" size={12} />
+                    Alert
+                  </Badge>
+                )}
+              </div>
               <p className={`text-3xl sm:text-5xl font-bold tabular-nums tracking-tight ${
                 balance > 0 ? 'text-destructive' : balance < 0 ? 'text-accent' : 'text-foreground'
               }`}>
