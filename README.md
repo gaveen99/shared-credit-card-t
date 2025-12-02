@@ -1,23 +1,73 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+# Shared Card Tracker
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+A modern web app for tracking shared credit card expenses between household and personal purchases. Built with React, TypeScript, and Tailwind CSS.
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
-🧠 What Can You Do?
+## Features
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+- **Multiple Entry Methods:**
+  - Manual entry with categorization
+  - Single SMS parsing for quick transaction entry
+  - Batch SMS import for processing multiple transactions at once
 
-🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
+- **Smart SMS Parsing:**
+  - Automatically extracts amount and merchant from bank SMS messages
+  - Supports multiple currencies (USD, LKR, INR, EUR, GBP)
+  - Works with various bank SMS formats
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+- **Transaction Categories:**
+  - Household expenses (split with parents)
+  - Personal expenses (your own)
+  - Cash deposits tracking
 
-📄 License For Spark Template Resources 
+- **Real-time Balance:**
+  - See who owes whom at a glance
+  - Visual indicators for positive/negative balances
+  - Separate totals for household spending and deposits
+
+- **Persistent Storage:**
+  - All data stored locally in your browser
+  - No account or login required
+  - Privacy-first design
+
+## Live Demo
+
+[View on GitHub Pages](https://your-username.github.io/your-repo-name/)
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on deploying to GitHub Pages.
+
+Quick steps:
+1. Push code to GitHub
+2. Enable GitHub Pages with GitHub Actions
+3. Access your deployed app
+
+## Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+## Technology Stack
+
+- React 19
+- TypeScript
+- Tailwind CSS v4
+- Vite
+- shadcn/ui components
+- Framer Motion
+- Phosphor Icons
+
+## License
 
 The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
